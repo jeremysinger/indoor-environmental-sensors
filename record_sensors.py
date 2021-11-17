@@ -68,11 +68,11 @@ sensor_ok['MCP3008'] = False
 sensor_ok['PMS5003'] = False
 
 sensor_errors = {}
-sensor_ok['TSL2561'] = 0
-sensor_ok['BME280'] = 0
-sensor_ok['CCS811'] = 0
-sensor_ok['MCP3008'] = 0
-sensor_ok['PMS5003'] = 0
+sensor_errors['TSL2561'] = 0
+sensor_errors['BME280'] = 0
+sensor_errors['CCS811'] = 0
+sensor_errors['MCP3008'] = 0
+sensor_errors['PMS5003'] = 0
 
 
 try:
