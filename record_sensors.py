@@ -12,12 +12,53 @@ import adafruit_ccs811
 
 from pms5003 import PMS5003
 
-INTERVAL_BETWEEN_SAMPLES = 5
+INTERVAL_BETWEEN_SAMPLES = 5   # 5 second measurement interval
+ERR_TIMEOUT = 10               # 10 second timeout after error
+MAX_ERR = 10                   # after 10 errors on a sensor, give up
 
 def err(sensor):
     print('---------' + sensor + ' error')
     sensor_ok[sensor] = False
     return
+
+def initPMS():
+    global pms5003
+    try:
+        sensor = 'PMS5003'
+        pms5003 = PMS5003(
+            device='/dev/ttyAMA0',
+            baudrate=9600,
+            pin_enable=22,
+            pin_reset=27
+        )
+        data = pms5003.read()
+        pm1 = data.pm_ug_per_m3(1)
+        pm25 = data.pm_ug_per_m3(2.5)
+        pm10 = data.pm_ug_per_m3(10)
+        sensor_ok[sensor] = True
+    except Exception as ex:
+        err(sensor)
+        print(ex)
+        pass
+    return
+
+def initCCS():
+    global ccs811
+    try:
+        sensor = 'CCS811'
+        ccs811 = adafruit_ccs811.CCS811(i2c)
+        while not ccs811.data_ready:
+            pass
+        # when using, remember to calibrate on temp
+        co2 = ccs811.eco2
+        voc = ccs811.tvoc
+        sensor_ok[sensor] = True
+    except Exception as ex:
+        err(sensor)
+        print(ex)
+        pass
+    return
+
 
 sensor_ok = {}   # sensor keys map to True if sensor working
 sensor_ok['TSL2561'] = False
@@ -25,6 +66,14 @@ sensor_ok['BME280'] = False
 sensor_ok['CCS811'] = False
 sensor_ok['MCP3008'] = False
 sensor_ok['PMS5003'] = False
+
+sensor_errors = {}
+sensor_ok['TSL2561'] = 0
+sensor_ok['BME280'] = 0
+sensor_ok['CCS811'] = 0
+sensor_ok['MCP3008'] = 0
+sensor_ok['PMS5003'] = 0
+
 
 try:
     sensor = 'TSL2561'
@@ -37,20 +86,6 @@ except Exception as ex:
     print(ex)
     pass
 
-try:
-    sensor = 'CCS811'
-    ccs811 = adafruit_ccs811.CCS811(i2c)
-    while not ccs811.data_ready:
-        pass
-    # remember to calibrate on temp
-    co2 = ccs811.eco2
-    voc = ccs811.tvoc
-    sensor_ok[sensor] = True
-except Exception as ex:
-    err(sensor)
-    print(ex)
-    pass
-    
 
 try:
     sensor = 'BME280'
@@ -82,26 +117,8 @@ except Exception as ex:
     print(ex)
     pass
 
-
-
-try:
-    sensor = 'PMS5003'
-    pms5003 = PMS5003(
-        device='/dev/ttyAMA0',
-        baudrate=9600,
-        pin_enable=22,
-        pin_reset=27
-    )
-    data = pms5003.read()
-    pm1 = data.pm_ug_per_m3(1)
-    pm25 = data.pm_ug_per_m3(2.5)
-    pm10 = data.pm_ug_per_m3(10)
-    sensor_ok[sensor] = True
-except Exception as ex:
-    err(sensor)
-    print(ex)
-    pass
-
+initCCS()
+initPMS()
 
 
 while True:
@@ -145,7 +162,13 @@ while True:
             voc = ccs811.tvoc
         except Exception as ex:
             sensor_ok['CCS811'] = False
+            sensor_errors['CCS811'] += 1
             print(ex)
+            if sensor_errors['CCS811'] < MAX_ERR:
+                # try to reset sensor
+                time.sleep(ERR_TIMEOUT)
+                ccs811.reset()
+                initCCS()
             pass
 
     if sensor_ok['MCP3008']:
@@ -166,7 +189,13 @@ while True:
             pm10 = data.pm_ug_per_m3(10)
         except Exception as ex:
             sensor_ok['PMS5003'] = False
+            sensor_errors['PMS5003'] += 1
             print(ex)
+            if sensor_errors['PMS5003'] < MAX_ERR:
+                # try to reset sensor
+                time.sleep(ERR_TIMEOUT)
+                pms5003.reset()
+                initPMS()
             pass
 
 
