@@ -84,13 +84,10 @@ try:
     sensor = 'TSL2561 or VEML7700'
     light = None
     i2c = busio.I2C(board.SCL, board.SDA, frequency=10000)
-    while not i2c.try_lock():
-        pass
     devices = i2c.scan()
 
     if TSL2561_CODE in devices:
         light = adafruit_tsl2561.TSL2561(i2c)
-        sensor_ok[sensor] = True
     elif VEML7700_CODE in devices:
         light = adafruit_veml7700.VEML7700(i2c)
     else:
