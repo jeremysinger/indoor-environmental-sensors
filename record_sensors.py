@@ -16,6 +16,10 @@ INTERVAL_BETWEEN_SAMPLES = 5   # 5 second measurement interval
 ERR_TIMEOUT = 10               # 10 second timeout after error
 MAX_ERR = 10                   # after 10 errors on a sensor, give up
 
+# i2c codes for light sensors (alternatives)
+TSL2561_CODE = 0x39
+VEML7700_CODE = 0x10
+
 def err(sensor):
     print('---------' + sensor + ' error')
     sensor_ok[sensor] = False
@@ -61,14 +65,14 @@ def initCCS():
 
 
 sensor_ok = {}   # sensor keys map to True if sensor working
-sensor_ok['TSL2561'] = False
+sensor_ok['TSL2561 or VEML7700'] = False
 sensor_ok['BME280'] = False
 sensor_ok['CCS811'] = False
 sensor_ok['MCP3008'] = False
 sensor_ok['PMS5003'] = False
 
 sensor_errors = {}
-sensor_errors['TSL2561'] = 0
+sensor_errors['TSL2561 or VEML7700'] = 0
 sensor_errors['BME280'] = 0
 sensor_errors['CCS811'] = 0
 sensor_errors['MCP3008'] = 0
@@ -76,9 +80,21 @@ sensor_errors['PMS5003'] = 0
 
 
 try:
-    sensor = 'TSL2561'
+    sensor = 'TSL2561 or VEML7700'
+    light = None
     i2c = busio.I2C(board.SCL, board.SDA, frequency=10000)
-    light = adafruit_tsl2561.TSL2561(i2c)
+    while not i2c.try_lock():
+        pass
+    devices = i2c.scan()
+
+    if TSL2561_CODE in devices:
+        light = adafruit_tsl2561.TSL2561(i2c)
+        sensor_ok[sensor] = True
+    elif VEML770_CODE in devices:
+        light = adafruit_veml770.VEML7700(i2c)
+    else:
+        raise Exception('no I2C light sensor detected')
+
     sensor_ok[sensor] = True
     lux = light.lux
 except Exception as ex:
@@ -134,11 +150,11 @@ while True:
     pm25 = 0
     pm10 = 0
     
-    if sensor_ok['TSL2561']:
+    if sensor_ok['TSL2561 or VEML7700']:
         try:
             lux = light.lux
         except Exception as ex:
-            sensor_ok['TSL2561'] = False
+            sensor_ok['TSL2561 or VEML7700'] = False
             print(ex)
             pass
             
