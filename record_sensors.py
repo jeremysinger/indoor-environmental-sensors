@@ -8,6 +8,7 @@ from adafruit_mcp3xxx.analog_in import AnalogIn
 
 from adafruit_bme280 import advanced as adafruit_bme280
 import adafruit_tsl2561
+import adafruit_veml7700
 import adafruit_ccs811
 
 from pms5003 import PMS5003
@@ -91,7 +92,7 @@ try:
         light = adafruit_tsl2561.TSL2561(i2c)
         sensor_ok[sensor] = True
     elif VEML7700_CODE in devices:
-        light = adafruit_veml770.VEML7700(i2c)
+        light = adafruit_veml7700.VEML7700(i2c)
     else:
         raise Exception('no I2C light sensor detected')
 
