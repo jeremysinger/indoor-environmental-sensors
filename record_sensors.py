@@ -90,7 +90,7 @@ try:
     if TSL2561_CODE in devices:
         light = adafruit_tsl2561.TSL2561(i2c)
         sensor_ok[sensor] = True
-    elif VEML770_CODE in devices:
+    elif VEML7700_CODE in devices:
         light = adafruit_veml770.VEML7700(i2c)
     else:
         raise Exception('no I2C light sensor detected')
