@@ -10,6 +10,7 @@ from adafruit_bme280 import advanced as adafruit_bme280
 import adafruit_tsl2561
 import adafruit_veml7700
 import adafruit_ccs811
+import adafruit_scd30
 
 from pms5003 import PMS5003
 
@@ -64,11 +65,29 @@ def initCCS():
         pass
     return
 
+def initSCD():
+    global scd30
+    try:
+        sensor = 'SCD30'
+        scd30 = adafruit_scd30.SCD30(i2c)
+        while not scd30.data_available:
+            pass
+        # when using, remember to calibrate on temp
+        co2 = scd30.CO2
+        temp = scd30.temperature
+        hum = scd30.relative_humidity
+        sensor_ok[sensor] = True
+    except Exception as ex:
+        err(sensor)
+        print(ex)
+        pass
+    return
 
 sensor_ok = {}   # sensor keys map to True if sensor working
 sensor_ok['TSL2561 or VEML7700'] = False
 sensor_ok['BME280'] = False
 sensor_ok['CCS811'] = False
+sensor_ok['SCD30'] = False
 sensor_ok['MCP3008'] = False
 sensor_ok['PMS5003'] = False
 
@@ -76,6 +95,7 @@ sensor_errors = {}
 sensor_errors['TSL2561 or VEML7700'] = 0
 sensor_errors['BME280'] = 0
 sensor_errors['CCS811'] = 0
+sensor_errors['SCD30'] = 0
 sensor_errors['MCP3008'] = 0
 sensor_errors['PMS5003'] = 0
 
@@ -85,6 +105,7 @@ try:
     light = None
     i2c = busio.I2C(board.SCL, board.SDA, frequency=10000)
     devices = i2c.scan()
+
 
     if TSL2561_CODE in devices:
         light = adafruit_tsl2561.TSL2561(i2c)
@@ -133,6 +154,7 @@ except Exception as ex:
 
 initCCS()
 initPMS()
+initSCD()
 
 
 while True:
@@ -147,6 +169,9 @@ while True:
     pm1 = 0
     pm25 = 0
     pm10 = 0
+    new_co2 = 0
+    new_temp = 0
+    new_hum = 0
     
     if sensor_ok['TSL2561 or VEML7700']:
         try:
@@ -185,6 +210,24 @@ while True:
                 initCCS()
             pass
 
+    if sensor_ok['SCD30']:
+        try:
+            while not scd30.data_available:
+                pass
+            new_co2 = scd30.CO2
+            new_temp = scd30.temperature
+            new_hum = scd30.relative_humidity
+        except Exception as ex:
+            sensor_ok['SCD30'] = False
+            sensor_errors['SCD30'] += 1
+            print(ex)
+            if sensor_errors['SCD30'] < MAX_ERR:
+                # try to reset sensor
+                time.sleep(ERR_TIMEOUT)
+                scd30.reset()
+                initSCD()
+            pass
+
     if sensor_ok['MCP3008']:
         try:
             vol = sound.value
@@ -214,8 +257,13 @@ while True:
 
 
     # now write out single line of comma-separated data
-    # ts,lux,temp,hum,press,co2,voc,vol,gas,pm1,pm25,pm10
     ts = str(datetime.datetime.now())
-    print(ts,lux,temp,hum,press,co2,voc,vol,gas,pm1,pm25,pm10, sep=',', end='\n')
+    if sensor_ok['SCD30']:
+        # Augment data with extra readings from new (expensive!) CO2 sensor...
+        # ts,lux,temp,new_temp,hum,new_hum,press,co2,new_co2,voc,vol,gas,pm1,pm25,pm10
+        print(ts,lux,temp,new_temp,hum,new_hum,press,co2,new_co2,voc,vol,gas,pm1,pm25,pm10, sep=',', end='\n')
+    else:
+        # ts,lux,temp,hum,press,co2,voc,vol,gas,pm1,pm25,pm10
+        print(ts,lux,temp,hum,press,co2,voc,vol,gas,pm1,pm25,pm10, sep=',', end='\n')
     
     time.sleep(INTERVAL_BETWEEN_SAMPLES) # in seconds
